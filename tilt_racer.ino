@@ -62,9 +62,9 @@ int dash_Y = 10; //default start for game begin
 int prev_dash_Y = 10;
 
 int enemy_speed = 1;
-int enemy_1_Y = 250;
+int enemy_1_Y = -100; //place way off screen
 int enemy_1_X = 0;
-int enemy_2_Y = 250;
+int enemy_2_Y = -100; //place way off screen
 int enemy_2_X = 0;
 int enemy_1_type = 0;
 int enemy_2_type = 0;
@@ -423,14 +423,14 @@ void draw_dashes(){
 
 void draw_enemies(){
 
-  if (enemy_1_Y > SCREEN_H + 10){
+  if (enemy_1_Y > SCREEN_H){
 
     pause_scoring = false;
-
+    enemy_1_Y = -PLAYER_HEIGHT;
+    enemy_2_Y = -PLAYER_HEIGHT;
     enemy_2_active = random(0,2);
 
     enemy_1_X = random(1,4); //find column, assign x later
-    enemy_1_Y = -PLAYER_HEIGHT;
     enemy_1_type = random(1,4); //get image type
 
     switch (enemy_1_X){
@@ -447,7 +447,6 @@ void draw_enemies(){
 
     if (enemy_2_active == 1){
       enemy_2_X = random(1,4);
-      enemy_2_Y = -PLAYER_HEIGHT;
       enemy_2_type = random(1,4); //get image type
 
       switch (enemy_2_X){
@@ -640,7 +639,7 @@ void game_reset(){
 void show_points(){
 
   if ((!gameOver) && (gameStarted)){
-    if ((enemy_1_Y > PLAYER_Y + PLAYER_HEIGHT + 1) && (!pause_scoring)){
+    if ((enemy_1_Y > PLAYER_Y + PLAYER_HEIGHT) && (!pause_scoring)){
       points += 1;
       if (enemy_2_active == 1){
         points += 1;
