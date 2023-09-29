@@ -47,6 +47,7 @@ bool gameStarted = false;
 bool gameOver = false;
 bool waiting_for_input = false;
 bool pause_scoring = true;
+bool gamePaused = false;
 
 int prevpoints = 0;
 int points = 0;
@@ -55,16 +56,18 @@ const int PLAYER_Y = 179;
 const int PLAYER_WIDTH = 24;
 const int PLAYER_HEIGHT = 51;
 int speed = 0;
+int prevSpeed = 0;
 const int max_speed = 750;
 const int dash_speed_increment = 100;
 
 int dash_Y = 10; //default start for game begin
 int prev_dash_Y = 10;
 
+const int enemy_start_Y = -100;
 int enemy_speed = 1;
-int enemy_1_Y = -100; //place way off screen
+int enemy_1_Y = 0; //place way off screen
 int enemy_1_X = 0;
-int enemy_2_Y = -100; //place way off screen
+int enemy_2_Y = 0; //place way off screen
 int enemy_2_X = 0;
 int enemy_1_type = 0;
 int enemy_2_type = 0;
@@ -92,11 +95,6 @@ lcd.color565(255, 0, 0)//red
 lcd.color565(255, 215, 0)//gold
 lcd.color565(255, 192, 203)//pink
 lcd.color565(255, 0, 255)//magenta
-*/
-
-/*
-TODO: fix double score bug
-  sometimes scores two points with single car after displaying two cars
 */
 
 # define C0 TRANSPARENT
@@ -384,7 +382,13 @@ void draw_background(){
 }
 
 void draw_dashes(){
-  dash_Y = prev_dash_Y + (speed / dash_speed_increment);
+
+  if (!gamePaused){
+    dash_Y = prev_dash_Y + (speed / dash_speed_increment);
+  } else {
+    dash_Y = prev_dash_Y;
+  }
+
   if (dash_Y >= (DASHGAP + DASHHEIGHT)){
     dash_Y = 0;
   }
@@ -492,9 +496,11 @@ void draw_enemies(){
     }
   }
 
-  enemy_1_Y += enemy_speed;
-  if (enemy_2_active == 1){
-    enemy_2_Y += enemy_speed;
+  if (!gamePaused){
+    enemy_1_Y += enemy_speed;
+    if (enemy_2_active == 1){
+      enemy_2_Y += enemy_speed;
+    }
   }
 
 }
@@ -542,24 +548,36 @@ void game_loop(){
     //wait for the next frame
   }
 
-  check_IMU();
+  if (!gamePaused) {
 
-  if (abs(accX)>0.1){
-    if (accX < 0){
-      //tilting right
-      if (PLAYER_X + enemy_speed <= (ROAD_START + ROAD_WIDTH - PLAYER_WIDTH)) {
-        PLAYER_X = PLAYER_X + enemy_speed;
+    check_IMU();
+
+    if (abs(accX)>0.1){
+      if (accX < 0){
+        //tilting right
+        if (PLAYER_X + enemy_speed <= (ROAD_START + ROAD_WIDTH - PLAYER_WIDTH)) {
+          PLAYER_X = PLAYER_X + enemy_speed;
+        } else {
+          PLAYER_X = ROAD_START + ROAD_WIDTH - PLAYER_WIDTH;
+        }
       } else {
-        PLAYER_X = ROAD_START + ROAD_WIDTH - PLAYER_WIDTH;
-      }
-    } else {
-      //tilting left
-      if (PLAYER_X - enemy_speed >= ROAD_START){
-        PLAYER_X = PLAYER_X - enemy_speed;
-      } else {
-        PLAYER_X = ROAD_START;
+        //tilting left
+        if (PLAYER_X - enemy_speed >= ROAD_START){
+          PLAYER_X = PLAYER_X - enemy_speed;
+        } else {
+          PLAYER_X = ROAD_START;
+        }
       }
     }
+
+    if (speed==0){
+      speed = 100;
+    }
+
+    if (speed != max_speed){
+      speed += 1;
+    }
+
   }
 
   draw_background();
@@ -567,13 +585,11 @@ void game_loop(){
   draw_enemies();
   draw_player();
   show_points();
-
-  if (speed==0){
-    speed = 100;
-  }
-
-  if (speed != max_speed){
-    speed += 1;
+  
+  if (gamePaused){
+    canvas.setTextSize(3);
+    canvas.drawCenterString("GAME",68,50);
+    canvas.drawCenterString("PAUSED",68,90);
   }
 
 }
@@ -609,22 +625,49 @@ void draw_battery(){
 }
 
 void check_buttons(){
+
   M5.update();
+
   if ((M5.BtnA.wasReleased()) && (waiting_for_input) && (!gameStarted)){
     //start game
     gameStarted = true;
+    return;
   }
+
   if ((M5.BtnA.wasReleased()) && (gameOver)){
     //play again
     game_reset();
+    return;
   }
+
+  if ((M5.BtnA.wasReleased()) && (!gamePaused) && (gameStarted) && (!gameOver)){
+    //pause
+    prevSpeed = speed;
+    speed = 0;
+    gamePaused = true;
+    return;
+  }
+
+  if ((M5.BtnA.wasReleased()) && (gamePaused) && (gameStarted) && (!gameOver)){
+    //un-pause
+    speed = prevSpeed;
+    gamePaused = false;
+    return;
+  }
+
+  if ((M5.BtnA.wasReleasefor(1000)) && (gamePaused) && (gameStarted) && (!gameOver)){
+    //restart
+    game_reset();
+    return;
+  }
+
 }
 
 void game_reset(){
   enemy_speed = 1;
-  enemy_1_Y = 250;
+  enemy_1_Y = enemy_start_Y;
   enemy_1_X = 0;
-  enemy_2_Y = 250;
+  enemy_2_Y = enemy_start_Y;
   enemy_2_X = 0;
   enemy_1_type = 0;
   enemy_2_type = 0;
@@ -633,6 +676,7 @@ void game_reset(){
   gameStarted = false;
   waiting_for_input = false;
   points = 0;
+  gamePaused = false;
   pause_scoring = true;
 }
 
@@ -663,6 +707,7 @@ void setup() {
   canvas.setColorDepth(16);
   M5.IMU.Init();
   display.setRotation(0);
+  game_reset();
 }
 
 void loop() {
